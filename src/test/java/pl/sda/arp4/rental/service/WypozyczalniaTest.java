@@ -2,12 +2,14 @@ package pl.sda.arp4.rental.service;
 
 import org.junit.Assert;
 import org.junit.Test;
+import pl.sda.arp4.rental.exceptions.SamochodNieIstniejeException;
 import pl.sda.arp4.rental.model.Samochod;
 import pl.sda.arp4.rental.model.SkrzyniaBiegow;
 import pl.sda.arp4.rental.model.StatusSamochodu;
 import pl.sda.arp4.rental.model.TypNadwozia;
 
-import java.util.List;
+import java.sql.Array;
+import java.util.*;
 
 // Czego funkcja nie powinna pozwalać:
 //  - dodawania pojazdu o istniejącym numerze rejestracyjnym
@@ -122,12 +124,128 @@ public class WypozyczalniaTest {
         Samochod samochodDoPorownania = new Samochod("test1", SkrzyniaBiegow.AUTOMATYCZNA, TypNadwozia.CABRIO, StatusSamochodu.NIEDOSTEPNY);
         Assert.assertTrue("Samochod powinien miec status niedostepny", wynikZwroconaLista.contains(samochodDoPorownania));
 
+
         // TODO: lista dostępnych powinna być rozmiaru 0
+        List<Samochod> wynikZwroconaListaWynajetych = wypozyczalnia.zwrocListeDostepnych();
+        Assert.assertEquals("Lista powinna zawierać 0 elementów", 0, wynikZwroconaListaWynajetych.size());
     }
 
     // penicola
-    @Test
+    @Test(expected = SamochodNieIstniejeException.class)
     public void test_uzytkownikNieZepsujeMetodyZmianyStatusuNaNiedostepnyPrzekazujacNieistniejacySamochod() {
 
+        Wypozyczalnia wypozyczalnia = new Wypozyczalnia();
+        wypozyczalnia.wynajmij("123", "Jan Kowalski", 2);
+        List<Samochod> listaWynajetych = wypozyczalnia.zwrocListeWynajetych();
+
     }
+
+    @Test
+    public void test_uzytkownikUsuwajacSamochodZmieniaStatus() {
+
+        Samochod testowanySamochod = new Samochod("test1", SkrzyniaBiegow.AUTOMATYCZNA, TypNadwozia.CABRIO, StatusSamochodu.DOSTEPNY);
+        Wypozyczalnia wypozyczalnia = new Wypozyczalnia();
+        wypozyczalnia.dodajSamochod(
+                testowanySamochod.getNumerRejestracyjny(),
+                testowanySamochod.getSkrzynia(),
+                testowanySamochod.getTyp(),
+                testowanySamochod.getStatus());
+
+        wypozyczalnia.usunSamochod("test1");
+        List lista = wypozyczalnia.zwrocListe();
+        boolean check = lista.get(0).toString().endsWith("NIEDOSTEPNY)");
+        Assert.assertTrue("Musi być spełniony warunek", check);
+    }
+
+    @Test
+    public void test_czyDobrzeZwracaneListy() {
+
+        Samochod testowanySamochod1 = new Samochod("test1", SkrzyniaBiegow.AUTOMATYCZNA, TypNadwozia.CABRIO, StatusSamochodu.WYNAJETY);
+        Samochod testowanySamochod2 = new Samochod("test2", SkrzyniaBiegow.AUTOMATYCZNA, TypNadwozia.CABRIO, StatusSamochodu.WYNAJETY);
+        Samochod testowanySamochod3 = new Samochod("test3", SkrzyniaBiegow.AUTOMATYCZNA, TypNadwozia.CABRIO, StatusSamochodu.NIEDOSTEPNY);
+        Wypozyczalnia wypozyczalnia = new Wypozyczalnia();
+        wypozyczalnia.dodajSamochod(
+                testowanySamochod1.getNumerRejestracyjny(),
+                testowanySamochod1.getSkrzynia(),
+                testowanySamochod1.getTyp(),
+                testowanySamochod1.getStatus());
+
+        wypozyczalnia.dodajSamochod(
+                testowanySamochod2.getNumerRejestracyjny(),
+                testowanySamochod2.getSkrzynia(),
+                testowanySamochod2.getTyp(),
+                testowanySamochod2.getStatus());
+
+        wypozyczalnia.dodajSamochod(
+                testowanySamochod3.getNumerRejestracyjny(),
+                testowanySamochod3.getSkrzynia(),
+                testowanySamochod3.getTyp(),
+                testowanySamochod3.getStatus());
+
+        List pojazdy = wypozyczalnia.zwrocListe();
+        Assert.assertEquals("Lista powinna zawierać 3 elementy bo 3 dodane auta", 3, pojazdy.size());
+
+        List pojazdyWynajete = wypozyczalnia.zwrocListeWynajetych();
+        Assert.assertEquals("Lista powinna zawierać 2 elementy bo 2 dodane auta wynajęte", 2, pojazdyWynajete.size());
+
+        List pojazdyDostepne = wypozyczalnia.zwrocListeDostepnych();
+        Assert.assertEquals("Lista powinna zawierać 0 elementy bo żaden nie jest dostepny", 0, pojazdyDostepne.size());
+    }
+
+    @Test
+    public void test_czyMoznaWynajacSamochod() {
+        Samochod testowanySamochod = new Samochod("test1", SkrzyniaBiegow.AUTOMATYCZNA, TypNadwozia.CABRIO, StatusSamochodu.DOSTEPNY);
+        Wypozyczalnia wypozyczalnia = new Wypozyczalnia();
+        wypozyczalnia.dodajSamochod(
+                testowanySamochod.getNumerRejestracyjny(),
+                testowanySamochod.getSkrzynia(),
+                testowanySamochod.getTyp(),
+                testowanySamochod.getStatus());
+        List listaWynajetych = wypozyczalnia.zwrocListeWynajetych();
+        Assert.assertEquals("Lista powinna zawierać 0 elementy bo żaden nie jest wynajety", 0, listaWynajetych.size());
+
+        wypozyczalnia.wynajmij(testowanySamochod.getNumerRejestracyjny(), "Jan Kowalski", 7);
+        List listaWynajetych2 = wypozyczalnia.zwrocListeWynajetych();
+        Assert.assertEquals("Lista powinna zawierać 1 elementy bo 1  jest wynajety", 1, listaWynajetych2.size());
+
+    }
+
+    @Test
+    public void test_łącznyZysk() {
+        Samochod testowanySamochod1 = new Samochod("test1", SkrzyniaBiegow.AUTOMATYCZNA, TypNadwozia.SUV, StatusSamochodu.DOSTEPNY);
+        Samochod testowanySamochod2 = new Samochod("test2", SkrzyniaBiegow.AUTOMATYCZNA, TypNadwozia.SUV, StatusSamochodu.DOSTEPNY);
+
+        Wypozyczalnia wypozyczalnia = new Wypozyczalnia();
+
+        wypozyczalnia.dodajSamochod(
+                testowanySamochod1.getNumerRejestracyjny(),
+                testowanySamochod1.getSkrzynia(),
+                testowanySamochod1.getTyp(),
+                testowanySamochod1.getStatus());
+
+        wypozyczalnia.dodajSamochod(
+                testowanySamochod2.getNumerRejestracyjny(),
+                testowanySamochod2.getSkrzynia(),
+                testowanySamochod2.getTyp(),
+                testowanySamochod2.getStatus());
+
+        wypozyczalnia.wynajmij("test1", "Jan Kowalski", 1);
+        wypozyczalnia.wynajmij("test2", "Jan Kowalski", 2);
+        List listaWynajetych = wypozyczalnia.zwrocListeWynajetych();
+        Assert.assertEquals("Lista powinna zawierać 2 elementy bo 2 auta wynajete", 2, listaWynajetych.size());
+
+
+        Optional<Double> cena = wypozyczalnia.sprawdzCeneSamochodu("test1", 1);
+        Optional<Double> spodziewanaCena = Optional.of(1000.0);
+        Assert.assertEquals("Koszt SUVa na jeden dzień 1000",spodziewanaCena , cena);
+
+        double zysk = wypozyczalnia.łącznyZysk();
+        double spodziewanyZysk = 3000.0;
+        Assert.assertEquals("Koszt SUVa na jeden dzień 1000 + kolejnego SUVa na dwa dni",spodziewanaCena , cena);
+
+    }
+
+
+
+
 }
